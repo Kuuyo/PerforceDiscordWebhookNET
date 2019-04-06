@@ -11,6 +11,19 @@ namespace PerforceDiscordWebhookNET
     {
         static void Main(string[] args)
         {
+            Repository rep = LoginPerforce();
+
+            IList<Changelist> changes = GetNewChangelists(rep);
+
+            Changelist changeList = rep.GetChangelist(changes[0].Id);
+
+            SendDiscordWebhook(changeList);
+
+            Console.ReadLine();
+        }
+
+        static Repository LoginPerforce()
+        {
             // https://www.perforce.com/manuals/p4api.net/p4api.net_reference/html/af6b5020-31c0-491f-b8c8-a803ae388198.htm
 
             // initialize the connection variables
@@ -20,7 +33,6 @@ namespace PerforceDiscordWebhookNET
             string p4client = Environment.GetEnvironmentVariable("P4CLIENT");
             string p4pass = Environment.GetEnvironmentVariable("P4PASSWORD");
             string p4host = Environment.GetEnvironmentVariable("P4HOST");
-            string p4path = Environment.GetEnvironmentVariable("P4PATH");
 
             // define the server, repository and connection
             Server server = new Server(new ServerAddress(p4port));
@@ -44,6 +56,13 @@ namespace PerforceDiscordWebhookNET
             // login to the server to get credential
             // (using null for options and user params)
             Credential cred = con.Login(p4pass, null, null);
+
+            return rep;
+        }
+
+        static IList<Changelist> GetNewChangelists(Repository rep)
+        {
+            string p4path = Environment.GetEnvironmentVariable("P4PATH");
 
             // set the options for the p4 changes command
             string clientName = "";
@@ -88,8 +107,11 @@ namespace PerforceDiscordWebhookNET
                 Console.WriteLine();
             }
 
-            Changelist changeList = rep.GetChangelist(changes[0].Id);
+            return changes;
+        }
 
+        static void SendDiscordWebhook(Changelist changeList)
+        {
             // TODO: Fix this uglyness
             string authorStr = changeList.OwnerName;
 
@@ -166,8 +188,6 @@ namespace PerforceDiscordWebhookNET
             string content = "Perforce change " + changeList.Id;
             IEnumerable<Embed> embeds = Enumerable.Repeat(embed, 1);
             discordWebhookClient.SendMessageAsync(content, false, embeds);
-
-            Console.ReadLine();
         }
     }
 }
