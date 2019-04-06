@@ -2,7 +2,8 @@
 using System.Collections.Generic;
 using Perforce.P4;
 using Discord.Webhook;
-using System.Runtime.InteropServices;
+using Discord;
+using System.Linq;
 
 namespace PerforceDiscordWebhookNET
 {
@@ -86,6 +87,85 @@ namespace PerforceDiscordWebhookNET
                 Console.WriteLine();
                 Console.WriteLine();
             }
+
+            Changelist changeList = rep.GetChangelist(changes[0].Id);
+
+            // TODO: Fix this uglyness
+            string authorStr = changeList.OwnerName;
+
+            string user1 = Environment.GetEnvironmentVariable("USER1");
+            string user2 = Environment.GetEnvironmentVariable("USER2");
+            string user3 = Environment.GetEnvironmentVariable("USER3");
+            string user4 = Environment.GetEnvironmentVariable("USER4");
+            string user5 = Environment.GetEnvironmentVariable("USER5");
+
+            string icon;
+
+            if (authorStr == user1)
+            {
+                icon = Environment.GetEnvironmentVariable("U1ICON");
+            }
+            else if (authorStr == user2)
+            {
+                icon = Environment.GetEnvironmentVariable("U2ICON");
+            }
+            else if (authorStr == user3)
+            {
+                icon = Environment.GetEnvironmentVariable("U3ICON");
+            }
+            else if (authorStr == user4)
+            {
+                icon = Environment.GetEnvironmentVariable("U4ICON");
+            }
+            else if (authorStr == user5)
+            {
+                icon = Environment.GetEnvironmentVariable("U5ICON");
+            }
+            else
+            {
+                icon = "https://cdn.discordapp.com/embed/avatars/0.png";
+            }
+
+            // Discord.net.webhook
+            ulong webhookId = Convert.ToUInt64(Environment.GetEnvironmentVariable("WEBHOOKID"));
+            string webhookToken = Environment.GetEnvironmentVariable("WEBHOOKTOKEN");
+            DiscordWebhookClient discordWebhookClient = new DiscordWebhookClient(webhookId, webhookToken);
+
+            EmbedAuthorBuilder author = new EmbedAuthorBuilder();
+            author
+                .WithName(authorStr)
+                .WithIconUrl(icon)
+                .Build();
+
+            EmbedFooterBuilder footer = new EmbedFooterBuilder();
+            footer
+                .WithIconUrl("https://i.imgur.com/qixMjRV.png")
+                .WithText("Helix Core")
+                .Build();
+
+            EmbedBuilder embedBuilder = new EmbedBuilder();
+            embedBuilder
+                .WithAuthor(author)
+                .WithFooter(footer)
+                .WithColor(Color.Blue)
+                .WithTitle(changeList.Description)
+                .WithDescription(changeList.ClientId)
+                .WithUrl(Environment.GetEnvironmentVariable("EMBEDURL"))
+                .WithTimestamp(changeList.ModifiedDate)
+                .WithThumbnailUrl(Environment.GetEnvironmentVariable("EMBEDTHUMB"));
+
+            foreach (var file in changeList.Files)
+            {
+                string title = file.Action.ToString() + ' ' + file.Type.ToString();
+                string value = file.DepotPath.Path + '#' + file.HeadRev.ToString();
+                embedBuilder.AddField(title, value);
+            }
+
+            Embed embed = embedBuilder.Build();
+
+            string content = "Perforce change " + changeList.Id;
+            IEnumerable<Embed> embeds = Enumerable.Repeat(embed, 1);
+            discordWebhookClient.SendMessageAsync(content, false, embeds);
 
             Console.ReadLine();
         }
