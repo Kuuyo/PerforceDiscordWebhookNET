@@ -13,12 +13,10 @@ namespace PerforceDiscordWebhookNET
         {
             Repository rep = LoginPerforce();
 
-            IList<Changelist> changes = GetNewChangelists(rep);
+            IList<Changelist> unsyncedChanges = GetNewChangelists(rep);
+            SendDiscordWebhook(unsyncedChanges);
 
-            Changelist changeList = rep.GetChangelist(changes[0].Id);
-
-            SendDiscordWebhook(changeList);
-
+            Console.WriteLine("Done!");
             Console.ReadLine();
         }
 
@@ -60,134 +58,172 @@ namespace PerforceDiscordWebhookNET
             return rep;
         }
 
-        static IList<Changelist> GetNewChangelists(Repository rep)
+        static IList<Changelist> GetNewChangelists(Repository rep, int maxItems = 5, string clientName = "", string userName = "")
         {
             string p4path = Environment.GetEnvironmentVariable("P4PATH");
 
-            // set the options for the p4 changes command
-            string clientName = "";
-            int maxItems = 5;
-            string userName = "";
             ChangesCmdOptions options = new ChangesCmdOptions(ChangesCmdFlags.FullDescription | ChangesCmdFlags.IncludeTime,
                     clientName, maxItems, ChangeListStatus.Submitted, userName);
 
-            // create a FileSpec for //depot/test.txt
-            // using new FileSpec(PathSpec path, VersionSpec version)
             PathSpec path = new DepotPath(p4path);
             FileSpec depotFile = new FileSpec(path, null);
 
-            // run the command against the current repository
-            IList<Changelist> changes = rep.GetChangelists(options, depotFile);
+            IList<Changelist> recentChanges = rep.GetChangelists(options, depotFile);
 
-            foreach (var c in changes)
+            string[] recentIds = new string[maxItems];
+            int it = 0;
+            foreach (var c in recentChanges)
             {
-                Changelist cl = rep.GetChangelist(c.Id);
-                Console.WriteLine(cl);
-                foreach (var f in cl.Files)
+                recentIds[it] = c.Id.ToString();
+                ++it;
+            }
+
+            string idFilePath = "RecentIds.txt";
+            List<string> unsyncedIds = new List<string>(5);
+
+            if (System.IO.File.Exists(idFilePath))
+            {
+                string[] recentIdsFile = System.IO.File.ReadAllLines(idFilePath);
+                
+                for (int i = 0; i < recentIds.Length; ++i)
                 {
-                    FileSpec fileSpec = new FileSpec(f.DepotPath, new Revision(f.HeadRev));
-                    Console.WriteLine(fileSpec.ToEscapedString());
-
-                    FileSpec fileSpec2 = new FileSpec(f.DepotPath, new Revision(f.HeadRev - 1));
-                    GetDepotFileDiffsCmdOptions opts =
-                        new GetDepotFileDiffsCmdOptions(GetDepotFileDiffsCmdFlags.None,
-                        0, 0, null, null, null);
-                    IList<DepotFileDiff> diff = rep.GetDepotFileDiffs(fileSpec.ToEscapedString(), fileSpec2.ToEscapedString(), opts);
-
-                    Console.WriteLine();
-                    Console.WriteLine("Changes:");
-
-                    foreach (var d in diff)
+                    bool isPresent = false;
+                    for (int j = 0; j < recentIdsFile.Length; ++j)
                     {
-                        Console.WriteLine(d.Diff);
-                        Console.WriteLine();
+                        isPresent = recentIdsFile[j].Contains(recentIds[i]);
+                        if (isPresent)
+                            break;
+                    }
+                    if (!isPresent)
+                    {
+                        unsyncedIds.Add(recentIds[i]);
                     }
                 }
-                Console.WriteLine();
-                Console.WriteLine();
-            }
-
-            return changes;
-        }
-
-        static void SendDiscordWebhook(Changelist changeList)
-        {
-            // TODO: Fix this uglyness
-            string authorStr = changeList.OwnerName;
-
-            string user1 = Environment.GetEnvironmentVariable("USER1");
-            string user2 = Environment.GetEnvironmentVariable("USER2");
-            string user3 = Environment.GetEnvironmentVariable("USER3");
-            string user4 = Environment.GetEnvironmentVariable("USER4");
-            string user5 = Environment.GetEnvironmentVariable("USER5");
-
-            string icon;
-
-            if (authorStr == user1)
-            {
-                icon = Environment.GetEnvironmentVariable("U1ICON");
-            }
-            else if (authorStr == user2)
-            {
-                icon = Environment.GetEnvironmentVariable("U2ICON");
-            }
-            else if (authorStr == user3)
-            {
-                icon = Environment.GetEnvironmentVariable("U3ICON");
-            }
-            else if (authorStr == user4)
-            {
-                icon = Environment.GetEnvironmentVariable("U4ICON");
-            }
-            else if (authorStr == user5)
-            {
-                icon = Environment.GetEnvironmentVariable("U5ICON");
             }
             else
             {
-                icon = "https://cdn.discordapp.com/embed/avatars/0.png";
+                unsyncedIds.AddRange(recentIds);
             }
 
-            // Discord.net.webhook
-            ulong webhookId = Convert.ToUInt64(Environment.GetEnvironmentVariable("WEBHOOKID"));
-            string webhookToken = Environment.GetEnvironmentVariable("WEBHOOKTOKEN");
-            DiscordWebhookClient discordWebhookClient = new DiscordWebhookClient(webhookId, webhookToken);
-
-            EmbedAuthorBuilder author = new EmbedAuthorBuilder();
-            author
-                .WithName(authorStr)
-                .WithIconUrl(icon)
-                .Build();
-
-            EmbedFooterBuilder footer = new EmbedFooterBuilder();
-            footer
-                .WithIconUrl("https://i.imgur.com/qixMjRV.png")
-                .WithText("Helix Core")
-                .Build();
-
-            EmbedBuilder embedBuilder = new EmbedBuilder();
-            embedBuilder
-                .WithAuthor(author)
-                .WithFooter(footer)
-                .WithColor(Color.Blue)
-                .WithTitle(changeList.Description)
-                .WithDescription(changeList.ClientId)
-                .WithUrl(Environment.GetEnvironmentVariable("EMBEDURL"))
-                .WithTimestamp(changeList.ModifiedDate)
-                .WithThumbnailUrl(Environment.GetEnvironmentVariable("EMBEDTHUMB"));
-
-            foreach (var file in changeList.Files)
+            List<Changelist> unsyncedLists = new List<Changelist>(unsyncedIds.Count);
+            if (unsyncedIds.Count > 0)
             {
-                string title = file.Action.ToString() + ' ' + file.Type.ToString();
-                string value = file.DepotPath.Path + '#' + file.HeadRev.ToString();
-                embedBuilder.AddField(title, value);
+                System.IO.File.WriteAllLines(idFilePath, unsyncedIds);
+
+                foreach (string id in unsyncedIds)
+                {
+                    Changelist cl = rep.GetChangelist(Convert.ToInt32(id));
+                    unsyncedLists.Add(cl);
+
+                    //foreach (var f in cl.Files)
+                    //{
+                    //    FileSpec fileSpec = new FileSpec(f.DepotPath, new Revision(f.HeadRev));
+                    //    Console.WriteLine(fileSpec.ToEscapedString());
+                    //
+                    //    FileSpec fileSpec2 = new FileSpec(f.DepotPath, new Revision(f.HeadRev - 1));
+                    //    GetDepotFileDiffsCmdOptions opts =
+                    //        new GetDepotFileDiffsCmdOptions(GetDepotFileDiffsCmdFlags.None,
+                    //        0, 0, null, null, null);
+                    //    IList<DepotFileDiff> diff = rep.GetDepotFileDiffs(fileSpec.ToEscapedString(), fileSpec2.ToEscapedString(), opts);
+                    //
+                    //    Console.WriteLine();
+                    //    Console.WriteLine("Changes:");
+                    //
+                    //    foreach (var d in diff)
+                    //    {
+                    //        Console.WriteLine(d.Diff);
+                    //        Console.WriteLine();
+                    //    }
+                    //}
+                }
+
+                unsyncedLists.Sort((x, y) => x.Id.CompareTo(y.Id));
             }
 
-            Embed embed = embedBuilder.Build();
+            return unsyncedLists;
+        }
 
-            string content = "Perforce change " + changeList.Id;
-            IEnumerable<Embed> embeds = Enumerable.Repeat(embed, 1);
-            discordWebhookClient.SendMessageAsync(content, false, embeds);
+        static void SendDiscordWebhook(IList<Changelist> changeListsToSend)
+        {
+            foreach (Changelist changeList in changeListsToSend)
+            {
+                // TODO: Fix this uglyness
+                string authorStr = changeList.OwnerName;
+
+                string user1 = Environment.GetEnvironmentVariable("USER1");
+                string user2 = Environment.GetEnvironmentVariable("USER2");
+                string user3 = Environment.GetEnvironmentVariable("USER3");
+                string user4 = Environment.GetEnvironmentVariable("USER4");
+                string user5 = Environment.GetEnvironmentVariable("USER5");
+
+                string icon;
+
+                if (authorStr == user1)
+                {
+                    icon = Environment.GetEnvironmentVariable("U1ICON");
+                }
+                else if (authorStr == user2)
+                {
+                    icon = Environment.GetEnvironmentVariable("U2ICON");
+                }
+                else if (authorStr == user3)
+                {
+                    icon = Environment.GetEnvironmentVariable("U3ICON");
+                }
+                else if (authorStr == user4)
+                {
+                    icon = Environment.GetEnvironmentVariable("U4ICON");
+                }
+                else if (authorStr == user5)
+                {
+                    icon = Environment.GetEnvironmentVariable("U5ICON");
+                }
+                else
+                {
+                    icon = "https://cdn.discordapp.com/embed/avatars/0.png";
+                }
+
+                // Discord.net.webhook
+                ulong webhookId = Convert.ToUInt64(Environment.GetEnvironmentVariable("WEBHOOKID"));
+                string webhookToken = Environment.GetEnvironmentVariable("WEBHOOKTOKEN");
+                DiscordWebhookClient discordWebhookClient = new DiscordWebhookClient(webhookId, webhookToken);
+
+                EmbedAuthorBuilder author = new EmbedAuthorBuilder();
+                author
+                    .WithName(authorStr)
+                    .WithIconUrl(icon)
+                    .Build();
+
+                EmbedFooterBuilder footer = new EmbedFooterBuilder();
+                footer
+                    .WithIconUrl("https://i.imgur.com/qixMjRV.png")
+                    .WithText("Helix Core")
+                    .Build();
+
+                EmbedBuilder embedBuilder = new EmbedBuilder();
+                embedBuilder
+                    .WithAuthor(author)
+                    .WithFooter(footer)
+                    .WithColor(Color.Blue)
+                    .WithTitle(changeList.Description)
+                    .WithDescription(changeList.ClientId)
+                    .WithUrl(Environment.GetEnvironmentVariable("EMBEDURL"))
+                    .WithTimestamp(changeList.ModifiedDate)
+                    .WithThumbnailUrl(Environment.GetEnvironmentVariable("EMBEDTHUMB"));
+
+                foreach (var file in changeList.Files)
+                {
+                    string title = file.Action.ToString() + ' ' + file.Type.ToString();
+                    string value = file.DepotPath.Path + '#' + file.HeadRev.ToString();
+                    embedBuilder.AddField(title, value);
+                }
+
+                Embed embed = embedBuilder.Build();
+
+                string content = "Perforce change " + changeList.Id;
+                IEnumerable<Embed> embeds = Enumerable.Repeat(embed, 1);
+                discordWebhookClient.SendMessageAsync(content, false, embeds);
+            }
         }
     }
 }
