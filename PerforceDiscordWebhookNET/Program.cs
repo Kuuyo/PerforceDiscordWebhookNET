@@ -4,6 +4,7 @@ using Perforce.P4;
 using Discord.Webhook;
 using Discord;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace PerforceDiscordWebhookNET
 {
@@ -191,6 +192,8 @@ namespace PerforceDiscordWebhookNET
                     concatDiffs += depotFileDiff.Diff;
                 }
 
+                string parsedDiffs = ParseFileDiffs(concatDiffs);
+
                 List<string> outputFile = new List<string>
                 {
                     "<!DOCTYPE html>",
@@ -208,10 +211,8 @@ namespace PerforceDiscordWebhookNET
                     "</h2>",
                     "<h3>",
                     "File: <b>" + fileDiff.File + "</b>",
-                    "</h3>",                    
-                    "<pre class=\"prettyprint lang-cs\">",
-                    concatDiffs,
-                    "</pre>",
+                    "</h3>",
+                    parsedDiffs,
                     "</body",
                     "</html>"
                 };
@@ -220,6 +221,32 @@ namespace PerforceDiscordWebhookNET
                 string strippedPath = fileDiff.File.Substring(start);
                 System.IO.File.WriteAllLines(strippedPath + ".html", outputFile);
             }
+        }
+
+        static string ParseFileDiffs(string concatDiffs)
+        {
+            string[] split = concatDiffs.Split('\n');
+
+            int lastHeadIndex = 0;
+            for (int i = 0; i < split.Length; ++i)
+            {
+                if (Regex.IsMatch(split[i], @"^\d"))
+                    lastHeadIndex = i;
+                else
+                {
+                    split[lastHeadIndex] += "\n" + split[i];
+                    split[i] = "";
+                }
+            }
+
+            split = split.Where(x => !string.IsNullOrEmpty(x)).ToArray();
+
+            for (int i = 0; i < split.Length; ++i)
+            {
+                split[i] = "<pre class=\"prettyprint lang-csharp\">" + split[i] + "</pre>";
+            }
+
+            return string.Join("",split);
         }
 
         static void SendDiscordWebhook(IList<Changelist> changeListsToSend)
