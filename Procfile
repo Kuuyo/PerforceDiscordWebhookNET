@@ -1,1 +1,0 @@
-worker: mono PerforceDiscordWebhookNET.exe
