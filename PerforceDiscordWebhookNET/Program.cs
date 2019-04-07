@@ -16,7 +16,8 @@ namespace PerforceDiscordWebhookNET
             IList<Changelist> unsyncedChanges = GetNewChangelists(rep);
             if (unsyncedChanges.Count > 0)
             {
-                IList<DepotFileDiff> fileDiffs = GetFileDiffs(rep, unsyncedChanges);
+                IList<FileDiffs> fileDiffs = GetFileDiffs(rep, unsyncedChanges);
+                CreateFileDiffsHtml(fileDiffs);
                 SendDiscordWebhook(unsyncedChanges);
             }
 
@@ -142,9 +143,25 @@ namespace PerforceDiscordWebhookNET
             return unsyncedLists;
         }
 
-        static IList<DepotFileDiff> GetFileDiffs(Repository rep, IList<Changelist> changelists, GetDepotFileDiffsCmdFlags flags = GetDepotFileDiffsCmdFlags.None)
+        struct FileDiffs
         {
-            List<DepotFileDiff> fileDiffs = new List<DepotFileDiff>(changelists.Count);
+            readonly public string File;
+            readonly public string Author;
+            readonly public int ChangelistId;
+            readonly public IList<DepotFileDiff> Diffs;
+
+            public FileDiffs(string file, string author, int changelistId, IList<DepotFileDiff> diffs)
+            {
+                File = file;
+                Author = author;
+                ChangelistId = changelistId;
+                Diffs = diffs;
+            }
+        }
+
+        static IList<FileDiffs> GetFileDiffs(Repository rep, IList<Changelist> changelists, GetDepotFileDiffsCmdFlags flags = GetDepotFileDiffsCmdFlags.None)
+        {
+            List<FileDiffs> fileDiffs = new List<FileDiffs>(changelists.Count);
 
             foreach (Changelist cl in changelists)
             {
@@ -156,16 +173,53 @@ namespace PerforceDiscordWebhookNET
                     GetDepotFileDiffsCmdOptions opts = new GetDepotFileDiffsCmdOptions(flags, 0, 0, null, null, null);
                     IList<DepotFileDiff> diff = rep.GetDepotFileDiffs(oldRev.ToEscapedString(), newRev.ToEscapedString(), opts);
 
-                    fileDiffs.AddRange(diff);
+                    FileDiffs diffs = new FileDiffs(newRev.ToEscapedString(), cl.OwnerName, cl.Id, diff);
+                    fileDiffs.Add(diffs);
                 }
             }
 
             return fileDiffs;
         }
 
-        static void ParseFileDiffs(IList<DepotFileDiff> diffs)
+        static void CreateFileDiffsHtml(IList<FileDiffs> diffs)
         {
+            foreach (FileDiffs fileDiff in diffs)
+            {
+                string concatDiffs = "";
+                foreach (DepotFileDiff depotFileDiff in fileDiff.Diffs)
+                {
+                    concatDiffs += depotFileDiff.Diff;
+                }
 
+                List<string> outputFile = new List<string>
+                {
+                    "<!DOCTYPE html>",
+                    "<html>",
+                    "<head>",
+                    "<link rel=\"stylesheet\" type=\"text/css\" href=\"styles.css\">",
+                    "<script src=\"https://cdn.jsdelivr.net/gh/google/code-prettify@master/loader/run_prettify.js\"></script>",
+                    "</head>",
+                    "<body>",
+                    "<h1>",
+                    "Changelist: <b>" + fileDiff.ChangelistId.ToString() + "</b>",
+                    "</h1>",
+                    "<h2>",
+                    "Author: <b>" + fileDiff.Author + "</b>",
+                    "</h2>",
+                    "<h3>",
+                    "File: <b>" + fileDiff.File + "</b>",
+                    "</h3>",                    
+                    "<pre class=\"prettyprint lang-cs\">",
+                    concatDiffs,
+                    "</pre>",
+                    "</body",
+                    "</html>"
+                };
+
+                int start = fileDiff.File.LastIndexOf('/') + 1;
+                string strippedPath = fileDiff.File.Substring(start);
+                System.IO.File.WriteAllLines(strippedPath + ".html", outputFile);
+            }
         }
 
         static void SendDiscordWebhook(IList<Changelist> changeListsToSend)
@@ -230,7 +284,7 @@ namespace PerforceDiscordWebhookNET
                     .WithAuthor(author)
                     .WithFooter(footer)
                     .WithColor(Color.Blue)
-                    .WithTitle(changeList.Description)
+                    .WithTitle("**" + changeList.Description + "**")
                     .WithDescription(changeList.ClientId)
                     .WithUrl(Environment.GetEnvironmentVariable("EMBEDURL"))
                     .WithTimestamp(changeList.ModifiedDate)
