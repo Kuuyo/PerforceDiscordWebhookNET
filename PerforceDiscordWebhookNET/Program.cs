@@ -14,7 +14,11 @@ namespace PerforceDiscordWebhookNET
             Repository rep = LoginPerforce();
 
             IList<Changelist> unsyncedChanges = GetNewChangelists(rep);
-            SendDiscordWebhook(unsyncedChanges);
+            if (unsyncedChanges.Count > 0)
+            {
+                IList<DepotFileDiff> fileDiffs = GetFileDiffs(rep, unsyncedChanges);
+                SendDiscordWebhook(unsyncedChanges);
+            }
 
             Console.WriteLine("Done!");
             Console.ReadLine();
@@ -130,33 +134,38 @@ namespace PerforceDiscordWebhookNET
                 {
                     Changelist cl = rep.GetChangelist(Convert.ToInt32(id));
                     unsyncedLists.Add(cl);
-
-                    //foreach (var f in cl.Files)
-                    //{
-                    //    FileSpec fileSpec = new FileSpec(f.DepotPath, new Revision(f.HeadRev));
-                    //    Console.WriteLine(fileSpec.ToEscapedString());
-                    //
-                    //    FileSpec fileSpec2 = new FileSpec(f.DepotPath, new Revision(f.HeadRev - 1));
-                    //    GetDepotFileDiffsCmdOptions opts =
-                    //        new GetDepotFileDiffsCmdOptions(GetDepotFileDiffsCmdFlags.None,
-                    //        0, 0, null, null, null);
-                    //    IList<DepotFileDiff> diff = rep.GetDepotFileDiffs(fileSpec.ToEscapedString(), fileSpec2.ToEscapedString(), opts);
-                    //
-                    //    Console.WriteLine();
-                    //    Console.WriteLine("Changes:");
-                    //
-                    //    foreach (var d in diff)
-                    //    {
-                    //        Console.WriteLine(d.Diff);
-                    //        Console.WriteLine();
-                    //    }
-                    //}
                 }
 
                 unsyncedLists.Sort((x, y) => x.Id.CompareTo(y.Id));
             }
 
             return unsyncedLists;
+        }
+
+        static IList<DepotFileDiff> GetFileDiffs(Repository rep, IList<Changelist> changelists, GetDepotFileDiffsCmdFlags flags = GetDepotFileDiffsCmdFlags.None)
+        {
+            List<DepotFileDiff> fileDiffs = new List<DepotFileDiff>(changelists.Count);
+
+            foreach (Changelist cl in changelists)
+            {
+                foreach (FileMetaData f in cl.Files)
+                {
+                    FileSpec oldRev = new FileSpec(f.DepotPath, new Revision(f.HeadRev - 1));
+                    FileSpec newRev = new FileSpec(f.DepotPath, new Revision(f.HeadRev));
+
+                    GetDepotFileDiffsCmdOptions opts = new GetDepotFileDiffsCmdOptions(flags, 0, 0, null, null, null);
+                    IList<DepotFileDiff> diff = rep.GetDepotFileDiffs(oldRev.ToEscapedString(), newRev.ToEscapedString(), opts);
+
+                    fileDiffs.AddRange(diff);
+                }
+            }
+
+            return fileDiffs;
+        }
+
+        static void ParseFileDiffs(IList<DepotFileDiff> diffs)
+        {
+
         }
 
         static void SendDiscordWebhook(IList<Changelist> changeListsToSend)
