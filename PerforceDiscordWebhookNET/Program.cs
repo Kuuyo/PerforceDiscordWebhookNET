@@ -14,16 +14,22 @@ namespace PerforceDiscordWebhookNET
         {
             Repository rep = LoginPerforce();
 
-            IList<Changelist> unsyncedChanges = GetNewChangelists(rep);
-            if (unsyncedChanges.Count > 0)
+            while (true)
             {
-                IList<FileDiffs> fileDiffs = GetFileDiffs(rep, unsyncedChanges);
-                CreateFileDiffsHtml(fileDiffs);
-                SendDiscordWebhook(unsyncedChanges);
-            }
+                IList<Changelist> unsyncedChanges = GetNewChangelists(rep);
 
-            Console.WriteLine("Done!");
-            Console.ReadLine();
+                if (unsyncedChanges.Count > 0)
+                {
+                    IList<FileDiffs> fileDiffs = GetFileDiffs(rep, unsyncedChanges);
+                    bool bUseGeneratedHtml = true;
+                    if (bUseGeneratedHtml)
+                        CreateFileDiffsHtml(fileDiffs);
+                    SendDiscordWebhook(unsyncedChanges, bUseGeneratedHtml);
+                }
+
+                Console.WriteLine("Checked");
+                System.Threading.Thread.Sleep(600000); // 10 mins
+            }
         }
 
         static Repository LoginPerforce()
@@ -298,7 +304,7 @@ namespace PerforceDiscordWebhookNET
             return string.Join("",split);
         }
 
-        static void SendDiscordWebhook(IList<Changelist> changeListsToSend)
+        static void SendDiscordWebhook(IList<Changelist> changeListsToSend, bool bUseGeneratedHtml)
         {
             foreach (Changelist changeList in changeListsToSend)
             {
@@ -366,10 +372,11 @@ namespace PerforceDiscordWebhookNET
                     .WithTimestamp(changeList.ModifiedDate)
                     .WithThumbnailUrl(Environment.GetEnvironmentVariable("EMBEDTHUMB"));
 
+                string rooturl = Environment.GetEnvironmentVariable("ROOTURL");
                 foreach (var file in changeList.Files)
                 {
                     string title = file.Action.ToString() + ' ' + file.Type.ToString();
-                    string value = file.DepotPath.Path + '#' + file.HeadRev.ToString();
+                    string value = "[" + file.DepotPath.Path + '#' + file.HeadRev.ToString() + "]" + "(" + rooturl + file.DepotPath.Path + '#' + file.HeadRev.ToString() + ")";
                     embedBuilder.AddField(title, value);
                 }
 
