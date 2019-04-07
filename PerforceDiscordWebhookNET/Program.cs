@@ -28,7 +28,7 @@ namespace PerforceDiscordWebhookNET
                 }
 
                 Console.WriteLine("Checked");
-                System.Threading.Thread.Sleep(600000); // 10 mins
+                System.Threading.Thread.Sleep(300000); // 5 mins
             }
         }
 

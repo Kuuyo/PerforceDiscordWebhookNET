@@ -12,7 +12,7 @@
 
   <ItemGroup>
     <Reference Include="p4api.net">
-      <HintPath>bin\Debug\netcoreapp2.1\p4api.net.dll</HintPath>
+      <HintPath>Resources\p4api.net.dll</HintPath>
     </Reference>
   </ItemGroup>
 
