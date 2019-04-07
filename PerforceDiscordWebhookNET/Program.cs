@@ -213,7 +213,7 @@ namespace PerforceDiscordWebhookNET
                     "File: <b>" + fileDiff.File + "</b>",
                     "</h3>",
                     parsedDiffs,
-                    "</body",
+                    "</body>",
                     "</html>"
                 };
 
@@ -228,23 +228,72 @@ namespace PerforceDiscordWebhookNET
             string[] split = concatDiffs.Split('\n');
 
             int lastHeadIndex = 0;
+            char[] changeSpecifiers = { 'a', 'c', 'd' };
+            string lineNumber2 = "";
             for (int i = 0; i < split.Length; ++i)
             {
                 if (Regex.IsMatch(split[i], @"^\d"))
+                {
                     lastHeadIndex = i;
+
+                    if (i > 0)
+                        split[i-1] += "\n</pre>\n</div>\n";
+
+                    int commaIndex1 = split[i].IndexOf(',');
+                    string lineNumber1 = "";
+
+                    int changeSpecifierIndex = split[i].IndexOfAny(changeSpecifiers);
+
+                    if(commaIndex1 < changeSpecifierIndex && commaIndex1 > 0)
+                        lineNumber1 = split[i].Substring(0, commaIndex1);
+                    else
+                        lineNumber1 = split[i].Substring(0, changeSpecifierIndex);
+
+                    int commaIndex2 = split[i].IndexOf(',', changeSpecifierIndex);
+
+                    if (commaIndex2 > 0)
+                        lineNumber2 = split[i].Substring(changeSpecifierIndex + 1, commaIndex2 - changeSpecifierIndex - 1);
+                    else
+                        lineNumber2 = split[i].Substring(changeSpecifierIndex + 1, split[i].Length - changeSpecifierIndex - 1);
+
+                    string preSpecifier = "\n<div class=\"block\">\n<h4>\n";
+                    string postSpecifier = "\n</h4>\n<pre class=\"prettyprint lang-csharp linenums:" + lineNumber1;
+
+                    char changeSpecifier = Convert.ToChar(split[i].Substring(changeSpecifierIndex, 1));
+                    switch (changeSpecifier)
+                    {
+                        case 'a':
+                            split[i] = preSpecifier + "Add:" + postSpecifier + " add\">";
+                            break;
+                        case 'c':
+                            split[i] = preSpecifier + "Change:" + postSpecifier + " delete\">";
+                            break;
+                        case 'd':
+                            split[i] = preSpecifier + "Delete:" + postSpecifier + " delete\">";
+                            break;
+                        default:
+                            Console.WriteLine("Unknown Change Specifier: " + changeSpecifier);
+                            break;
+                    }
+                }
+                else if (Regex.IsMatch(split[i], @"^-"))
+                {
+                    lastHeadIndex = i;
+                    split[i] = "\n</pre>\n<pre class=\"prettyprint lang-csharp linenums:" + lineNumber2 + " add\">";
+                }
                 else
                 {
-                    split[lastHeadIndex] += "\n" + split[i];
-                    split[i] = "";
+                    if (split[i].Length > 0)
+                    {
+                        split[lastHeadIndex] += "\n" + split[i].Substring(1);
+                        split[i] = "";
+                    }
                 }
             }
 
-            split = split.Where(x => !string.IsNullOrEmpty(x)).ToArray();
+            split = split.Append("</pre>\n</div>").ToArray();
 
-            for (int i = 0; i < split.Length; ++i)
-            {
-                split[i] = "<pre class=\"prettyprint lang-csharp\">" + split[i] + "</pre>";
-            }
+            split = split.Where(x => !string.IsNullOrEmpty(x)).ToArray();
 
             return string.Join("",split);
         }
