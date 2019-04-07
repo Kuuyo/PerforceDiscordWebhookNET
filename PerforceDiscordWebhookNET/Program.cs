@@ -84,20 +84,36 @@ namespace PerforceDiscordWebhookNET
             if (System.IO.File.Exists(idFilePath))
             {
                 string[] recentIdsFile = System.IO.File.ReadAllLines(idFilePath);
-                
+
+                int equalIndex = recentIds.Length;
+
                 for (int i = 0; i < recentIds.Length; ++i)
                 {
-                    bool isPresent = false;
                     for (int j = 0; j < recentIdsFile.Length; ++j)
                     {
-                        isPresent = recentIdsFile[j].Contains(recentIds[i]);
-                        if (isPresent)
+                        if (Convert.ToInt32(recentIds[j]) > Convert.ToInt32(recentIdsFile[i]))
+                        {
+                            continue;
+                        }  
+                        else if (Convert.ToInt32(recentIds[j]) == Convert.ToInt32(recentIdsFile[i]))
+                        {
+                            equalIndex = j;
                             break;
+                        }
+                        else
+                        {
+                            Console.WriteLine("WARNING: Equal not found, changes possibly missed > Consider increasing maxItems");
+                        }
                     }
-                    if (!isPresent)
+                    if (equalIndex < recentIds.Length)
                     {
-                        unsyncedIds.Add(recentIds[i]);
+                        break;
                     }
+                }
+
+                for (int i = 0; i < equalIndex; ++i)
+                {
+                    unsyncedIds.Add(recentIds[i]);
                 }
             }
             else
