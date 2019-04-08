@@ -5,6 +5,7 @@ using Discord.Webhook;
 using Discord;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Reflection;
 
 namespace PerforceDiscordWebhookNET
 {
