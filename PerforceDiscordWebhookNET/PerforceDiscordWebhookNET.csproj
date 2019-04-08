@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="Discord.Net.Webhook" Version="2.0.1" />
+    <PackageReference Include="p4api.net.x64" Version="2019.1.177.4442" />
   </ItemGroup>
 
   <ItemGroup>
@@ -17,10 +18,7 @@
   </ItemGroup>
   
   <Target Name="AfterBuild">
-    <Copy SourceFiles="$(ProjectDir)Resources\*" 
-          DestinationFolder="$(OutDir)\*" 
-          OverwriteReadOnlyFiles="true" 
-          SkipUnchangedFiles="false" />
+    <Copy SourceFiles="$(ProjectDir)Resources\*" DestinationFolder="$(OutDir)\*" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" />
   </Target>
 
 </Project>
