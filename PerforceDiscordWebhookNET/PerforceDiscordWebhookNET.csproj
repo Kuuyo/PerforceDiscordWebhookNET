@@ -9,22 +9,30 @@
   <ItemGroup>
     <PackageReference Include="Discord.Net.Webhook" Version="2.0.1" />
   </ItemGroup>
-  
-<ItemGroup>
-  <Reference Include="p4api.net">
-    <HintPath>p4api.net.dll</HintPath>
-    <SpecificVersion>False</SpecificVersion> 
-    <!-- You may set it to true if your dll has a specific version -->
-  </Reference>
-</ItemGroup>
 
-<ItemGroup>
-  <Reference Include="p4bridge">
-    <HintPath>p4bridge.dll</HintPath>
-    <SpecificVersion>False</SpecificVersion> 
-    <!-- You may set it to true if your dll has a specific version -->
-  </Reference>
-</ItemGroup>
+  <ItemGroup>
+    <Reference Include="p4api.net">
+      <HintPath>Resources\p4api.net.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Program.cs">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Diffs\styles.css">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="p4bridge.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="p4bridge.pdb">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
   
   <Target Name="AfterBuild">
     <Copy SourceFiles="$(ProjectDir)Resources\*" DestinationFolder="$(OutDir)\*" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" />

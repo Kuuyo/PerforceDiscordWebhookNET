@@ -226,7 +226,7 @@ namespace PerforceDiscordWebhookNET
 
                 int start = fileDiff.File.LastIndexOf('/') + 1;
                 string strippedPath = fileDiff.File.Substring(start);
-                System.IO.File.WriteAllLines(strippedPath + ".html", outputFile);
+                System.IO.File.WriteAllLines("Diffs/" + strippedPath + ".html", outputFile);
             }
         }
 
@@ -377,7 +377,9 @@ namespace PerforceDiscordWebhookNET
                 foreach (var file in changeList.Files)
                 {
                     string title = file.Action.ToString() + ' ' + file.Type.ToString();
-                    string value = "[" + file.DepotPath.Path + '#' + file.HeadRev.ToString() + "]" + "(" + rooturl + file.DepotPath.Path + '#' + file.HeadRev.ToString() + ")";
+                    int start = file.DepotPath.Path.LastIndexOf('/') + 1;
+                    string strippedPath = file.DepotPath.Path.Substring(start);
+                    string value = "[" + file.DepotPath.Path + '#' + file.HeadRev.ToString() + "]" + "(" + rooturl + "Diffs/" + strippedPath + '#' + file.HeadRev.ToString() + ")";
                     embedBuilder.AddField(title, value);
                 }
 
