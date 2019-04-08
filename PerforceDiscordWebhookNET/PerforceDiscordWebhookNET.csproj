@@ -26,6 +26,9 @@
     <None Update="Diffs\styles.css">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="libp4bridge.dylib">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="p4bridge.dll">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
