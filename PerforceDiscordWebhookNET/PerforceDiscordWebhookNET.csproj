@@ -16,6 +16,12 @@
       <HintPath>Resources\p4api.net.dll</HintPath>
     </Reference>
   </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Program.cs">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Compile>
+  </ItemGroup>
   
   <Target Name="AfterBuild">
     <Copy SourceFiles="$(ProjectDir)Resources\*" DestinationFolder="$(OutDir)\*" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" />
